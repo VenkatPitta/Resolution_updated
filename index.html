@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resolution Distribution</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 0 auto;
+            max-width: 1200px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            gap: 10px;
+        }
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            background: #f0f0f0;
+            transition: all 0.3s;
+        }
+        .button:hover {
+            background: #e0e0e0;
+        }
+        .button.active {
+            background: #007bff;
+            color: white;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 0 auto;
+        }
+        .summary {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 16px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Resolution Distribution</div>
+        </div>
+        <div class="controls">
+            <div class="control-group" id="splitButtons">
+                <button class="button active" data-split="train">Training</button>
+                <button class="button" data-split="val">Validation</button>
+                <button class="button" data-split="test">Test</button>
+            </div>
+            <div class="control-group" id="classButtons">
+                <button class="button active" data-class="Corrosion">Corrosion</button>
+                <button class="button" data-class="Deposits">Deposits</button>
+                <button class="button" data-class="Joint Separation">Joint Separation</button>
+                <button class="button" data-class="Normal Frames">Normal Frames</button>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="resolutionChart"></canvas>
+        </div>
+        <div id="summary" class="summary"></div>
+    </div>
+
+    <script>
+        const data = {
+            train: {
+                'Corrosion': {
+                    '640x480': 1556,
+                    '360x240': 471,
+                    '720x480': 164,
+                    '320x240': 15
+                },
+                'Deposits': {
+                    '320x240': 400,
+                    '720x576': 100,
+                    '640x480': 232
+                },
+                'Joint Separation': {
+                    '320x240': 96,
+                    '640x480': 23
+                },
+                'Normal Frames': {
+                    '640x480': 2537,
+                    '360x240': 141,
+                    '720x480': 120,
+                    '320x240': 16
+                }
+            },
+            val: {
+                'Corrosion': {
+                    '640x480': 253,
+                    '720x480': 22
+                },
+                'Deposits': {
+                    '720x576': 9,
+                    '320x240': 51,
+                    '640x480': 92
+                },
+                'Joint Separation': {
+                    '640x480': 14
+                },
+                'Normal Frames': {
+                    '640x480': 201,
+                    '720x576': 150
+                }
+            },
+            test: {
+                'Corrosion': {
+                    '640x480': 6,
+                    '360x240': 203,
+                    '720x576': 68
+                },
+                'Deposits': {
+                    '720x576': 9,
+                    '320x240': 49,
+                    '640x480': 93
+                },
+                'Joint Separation': {
+                    '640x480': 16
+                },
+                'Normal Frames': {
+                    '720x576': 128,
+                    '704x480': 172,
+                    '360x240': 53
+                }
+            }
+        };
+
+        let currentSplit = 'train';
+        let currentClass = 'Corrosion';
+        let chart = null;
+
+        // Add click handlers to all buttons
+        document.getElementById('splitButtons').addEventListener('click', (e) => {
+            if (e.target.dataset.split) {
+                currentSplit = e.target.dataset.split;
+                // Update split buttons
+                document.querySelectorAll('[data-split]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.split === currentSplit);
+                });
+                updateChart();
+            }
+        });
+
+        document.getElementById('classButtons').addEventListener('click', (e) => {
+            if (e.target.dataset.class) {
+                currentClass = e.target.dataset.class;
+                // Update class buttons
+                document.querySelectorAll('[data-class]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.class === currentClass);
+                });
+                updateChart();
+            }
+        });
+
+        function updateChart() {
+            const ctx = document.getElementById('resolutionChart');
+            const resolutionData = data[currentSplit][currentClass] || {};
+            const total = Object.values(resolutionData).reduce((sum, count) => sum + count, 0);
+
+            // Prepare data
+            const resolutions = Object.keys(resolutionData);
+            const counts = Object.values(resolutionData);
+            const percentages = counts.map(count => ((count / total) * 100).toFixed(1));
+
+            // Destroy previous chart if it exists
+            if (chart) {
+                chart.destroy();
+            }
+
+            // Create new chart
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: resolutions,
+                    datasets: [{
+                        label: 'Number of Images',
+                        data: counts,
+                        backgroundColor: '#4e79a7',
+                        borderColor: '#4e79a7',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Resolution Distribution - ${currentClass} (${currentSplit} set)`,
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const count = context.raw;
+                                    const percentage = percentages[context.dataIndex];
+                                    return `Count: ${count} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Images'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Resolution'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update summary
+            const summaryText = `Total images: ${total} | ` + 
+                resolutions.map((res, i) => `${res}: ${counts[i]} (${percentages[i]}%)`).join(' | ');
+            document.getElementById('summary').textContent = summaryText;
+        }
+
+        // Initial render
+        window.onload = updateChart;
+    </script>
+</body>
+</html>
